@@ -56,8 +56,7 @@ public class Robot extends IterativeRobot {
 	public void robotInit() {
 		c.setClosedLoopControl(true);
 		pressureGood = false;
-		sol_01.set(DoubleSolenoid.Value.kOff);
-		sol_23.set(DoubleSolenoid.Value.kOff);
+		driveNeutral();
 		//sol_11.set(false);
 	}
 
@@ -91,6 +90,7 @@ public class Robot extends IterativeRobot {
 	public void teleopInit() {
 		c.setClosedLoopControl(true);
 		pressureGood = false;
+		driveLo();
 	}
 
 	/**
@@ -120,31 +120,27 @@ public class Robot extends IterativeRobot {
     		if (currentCount > 100) {
     			currentCount = 0;
     			if (airOn) {
-    				sol_01.set(DoubleSolenoid.Value.kOff);
-    				sol_23.set(DoubleSolenoid.Value.kOff);
+    				driveHi();
     				//sol_11.set(false);
     			} else {
     				airOn = true;    				
-    				sol_01.set(DoubleSolenoid.Value.kForward);
-    				sol_23.set(DoubleSolenoid.Value.kForward);
+    				driveLo();
     				//sol_11.set(true);
     			}
     		}
     	}
  * */
  
-    	if (_gamepad.getRawButton(1)){
+    	if (_gamepad.getRawButton(1)){ // button X
     			_rearRightMotor.set(0.1);
     			_frontRightMotor.set(0.1);
     	}
     	
 
-    	if (_gamepad.getRawButton(6)){
-    		sol_01.set(DoubleSolenoid.Value.kReverse);
-    		sol_23.set(DoubleSolenoid.Value.kReverse);
+    	if (_gamepad.getRawButton(6)){ // right shoulder
+    		driveHi();
     	} else {
-    		sol_01.set(DoubleSolenoid.Value.kForward);
-    		sol_23.set(DoubleSolenoid.Value.kForward);
+    		driveLo();
     	}
 
 	}
@@ -155,5 +151,20 @@ public class Robot extends IterativeRobot {
 	@Override
 	public void testPeriodic() {
 		LiveWindow.run();
+	}
+	
+	public void driveLo() {
+		sol_01.set(DoubleSolenoid.Value.kForward);
+		sol_23.set(DoubleSolenoid.Value.kForward);
+	}
+	
+	public void driveHi() {
+		sol_01.set(DoubleSolenoid.Value.kReverse);
+		sol_23.set(DoubleSolenoid.Value.kReverse);		
+	}
+	
+	public void driveNeutral() {
+		sol_01.set(DoubleSolenoid.Value.kOff);
+		sol_23.set(DoubleSolenoid.Value.kOff);
 	}
 }
