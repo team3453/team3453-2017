@@ -9,12 +9,7 @@ import edu.wpi.first.wpilibj.livewindow.LiveWindow;
 import edu.wpi.first.wpilibj.Compressor;
 import com.ctre.CANTalon;
 import edu.wpi.first.wpilibj.DoubleSolenoid;
-//import edu.wpi.first.wpilibj.Solenoid;
-/*
-import edu.wpi.first.wpilibj.Joystick.AxisType;
-import edu.wpi.first.wpilibj.RobotDrive.MotorType;
-import com.ctre.CANTalon.TalonControlMode;
-*/
+
 
 /**
  * The VM is configured to automatically run this class, and to call the
@@ -96,9 +91,6 @@ public class Robot extends IterativeRobot {
 	public void teleopInit() {
 		c.setClosedLoopControl(true);
 		pressureGood = false;
-		//sol_11.set(false);
-		sol_01.set(DoubleSolenoid.Value.kOff);
-		sol_23.set(DoubleSolenoid.Value.kOff);
 	}
 
 	/**
@@ -116,17 +108,14 @@ public class Robot extends IterativeRobot {
 		double forward = _gamepad.getRawAxis(1); // logitech gamepad left Y, positive is forward
     	double turn = _gamepad.getRawAxis(4); //logitech gamepad right X, positive means turn right
     
-    	_drive.arcadeDrive(forward, turn);
-    	//sol_11.set(true);
-    	
-    	//f gvvvsol_01.set(DoubleSolenoid.Value.kForward);
-      	//sol_23.set(DoubleSolenoid.Value.kForward);
-    	    	
-		
-		
+    	_drive.arcadeDrive(forward, -turn);
+
+    	if(_joy.getRawButton(3)){
+    		_placeHolder1.set(0.1);
+    	}
     	
 		/*
-//    	if (pressureGood) {
+   	if (pressureGood) {
     		currentCount++;
     		if (currentCount > 100) {
     			currentCount = 0;
@@ -141,7 +130,7 @@ public class Robot extends IterativeRobot {
     				//sol_11.set(true);
     			}
     		}
-//    	}
+    	}
  * */
  
     	if (_gamepad.getRawButton(1)){
@@ -151,11 +140,11 @@ public class Robot extends IterativeRobot {
     	
 
     	if (_gamepad.getRawButton(6)){
-    		sol_01.set(DoubleSolenoid.Value.kForward);
-    		sol_23.set(DoubleSolenoid.Value.kForward);
-    	} else {
     		sol_01.set(DoubleSolenoid.Value.kReverse);
     		sol_23.set(DoubleSolenoid.Value.kReverse);
+    	} else {
+    		sol_01.set(DoubleSolenoid.Value.kForward);
+    		sol_23.set(DoubleSolenoid.Value.kForward);
     	}
 
 	}
