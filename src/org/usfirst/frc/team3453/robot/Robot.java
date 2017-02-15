@@ -1,24 +1,20 @@
 package org.usfirst.frc.team3453.robot;
 
-import edu.wpi.first.wpilibj.IterativeRobot;
+import edu.wpi.first.wpilibj.SampleRobot;
 
 import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.RobotDrive;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.livewindow.LiveWindow;
 import edu.wpi.first.wpilibj.Compressor;
-import com.ctre.CANTalon;
 import edu.wpi.first.wpilibj.DoubleSolenoid;
+import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+import edu.wpi.first.wpilibj.buttons.JoystickButton;
+import com.ctre.CANTalon;
 
 
-/**
- * The VM is configured to automatically run this class, and to call the
- * functions corresponding to each mode, as described in the IterativeRobot
- * documentation. If you change the name of this class or the package after
- * creating this project, you must also update the manifest file in the resource
- * directory.
- */
-public class Robot extends IterativeRobot {
+public class Robot extends SampleRobot {
 	
 	public boolean pressureGood = false;
 	
@@ -64,92 +60,106 @@ public class Robot extends IterativeRobot {
 	 * This function is run once each time the robot enters autonomous mode
 	 */
 	@Override
-	public void autonomousInit() {
+	public void autonomous() {
 		timer.reset();
 		timer.start();
-	}
+		
+		/**
+		 * This autonomous (along with the chooser code above) shows how to select
+		 * between different autonomous modes using the dashboard. The sendable
+		 * chooser code works with the Java SmartDashboard. If you prefer the
+		 * LabVIEW Dashboard, remove all of the chooser code and uncomment the
+		 * getString line to get the auto name from the text box below the Gyro
+		 *
+		 * You can add additional auto modes by adding additional comparisons to the
+		 * if-else structure below with additional strings. If using the
+		 * SendableChooser make sure to add them to the chooser code above as well.
+		 */
+		
+		String autoSelected = chooser.getSelected();
+		// String autoSelected = SmartDashboard.getString("Auto Selector",
+		// defaultAuto);
+		System.out.println("Auto selected: " + autoSelected);
 
-	/**
-	 * This function is called periodically during autonomous
-	 */
-	@Override
-	public void autonomousPeriodic() {
-		// Drive for 2 seconds
-		if (timer.get() < 2.0) {
-			myRobot.drive(-0.5, 0.0); // drive forwards half speed
-		} else {
+		/**
+		 * Purely from the preset code when using Sample Robot 
+		 */
+		
+		switch (autoSelected) {
+		case customAuto:
+			myRobot.setSafetyEnabled(false);
+			myRobot.drive(-0.5, 1.0); // spin at half speed
+			Timer.delay(2.0); // for 2 seconds
 			myRobot.drive(0.0, 0.0); // stop robot
+			break;
+		case defaultAuto:
+		default:
+			myRobot.setSafetyEnabled(false);
+			myRobot.drive(-0.5, 0.0); // drive forwards half speed
+			Timer.delay(2.0); // for 2 seconds
+			myRobot.drive(0.0, 0.0); // stop robot
+			break;
 		}
+		
 	}
 
-	/**
-	 * This function is called once each time the robot enters tele-operated
-	 * mode
-	 */
-	@Override
-	public void teleopInit() {
+	public void operatorControl(){
+		
 		c.setClosedLoopControl(true);
 		pressureGood = false;
 		driveLo();
-	}
-
-	/**
-	 * This function is called periodically during operator control
-	 */
-	@Override
-	public void teleopPeriodic() {
 		
-		if(c.getPressureSwitchValue()){ //pressure switch good then set true else be false
-			pressureGood = false;
-		} else {
-			pressureGood = true;
+		myRobot.setSafetyEnabled(true);
+		while (isOperatorControl() && isEnabled()) {
+			if(c.getPressureSwitchValue()){ //pressure switch good then set true else be false
+				pressureGood = false;
+			} else {
+				pressureGood = true;
+			}
+			
+			double forward = _gamepad.getRawAxis(1); // logitech gamepad left Y, positive is forward
+	    	double turn = _gamepad.getRawAxis(4); //logitech gamepad right X, positive means turn right
+	    
+	    	_drive.arcadeDrive(forward, -turn);
+
+	    	if(_joy.getRawButton(3)){
+	    		_placeHolder1.set(0.1);
+	    	}
+	    	
+			/*
+	   	if (pressureGood) {
+	    		currentCount++;
+	    		if (currentCount > 100) {
+	    			currentCount = 0;
+	    			if (airOn) {
+	    				driveHi();
+	    				//sol_11.set(false);
+	    			} else {
+	    				airOn = true;    				
+	    				driveLo();
+	    				//sol_11.set(true);
+	    			}
+	    		}
+	    	}
+	 * */
+	 
+	    	if (_gamepad.getRawButton(1)){ // button X
+	    			_rearRightMotor.set(0.1);
+	    			_frontRightMotor.set(0.1);
+	    	}
+	    	
+
+	    	if (_gamepad.getRawButton(6)){ // right shoulder
+	    		driveHi();
+	    	} else {
+	    		driveLo();
+	    	}
 		}
 		
-		double forward = _gamepad.getRawAxis(1); // logitech gamepad left Y, positive is forward
-    	double turn = _gamepad.getRawAxis(4); //logitech gamepad right X, positive means turn right
-    
-    	_drive.arcadeDrive(forward, -turn);
-
-    	if(_joy.getRawButton(3)){
-    		_placeHolder1.set(0.1);
-    	}
-    	
-		/*
-   	if (pressureGood) {
-    		currentCount++;
-    		if (currentCount > 100) {
-    			currentCount = 0;
-    			if (airOn) {
-    				driveHi();
-    				//sol_11.set(false);
-    			} else {
-    				airOn = true;    				
-    				driveLo();
-    				//sol_11.set(true);
-    			}
-    		}
-    	}
- * */
- 
-    	if (_gamepad.getRawButton(1)){ // button X
-    			_rearRightMotor.set(0.1);
-    			_frontRightMotor.set(0.1);
-    	}
-    	
-
-    	if (_gamepad.getRawButton(6)){ // right shoulder
-    		driveHi();
-    	} else {
-    		driveLo();
-    	}
-
 	}
 
-	/**
-	 * This function is called periodically during test mode
-	 */
 	@Override
-	public void testPeriodic() {
+	public void test() {
 		LiveWindow.run();
 	}
 	
