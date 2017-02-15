@@ -27,9 +27,9 @@ public class Robot extends SampleRobot {
 	CANTalon _frontRightMotor = new CANTalon(3);
 	CANTalon _rearRightMotor = new CANTalon(4);
 	
-	CANTalon _placeHolder1 = new CANTalon(5);
-	CANTalon _placeHolder2 = new CANTalon(6);
-	CANTalon _placeHolder3 = new CANTalon(7);
+	CANTalon _climber = new CANTalon(5);
+	CANTalon _ballIntake = new CANTalon(6);
+	CANTalon _ballShooter = new CANTalon(7);
 	
 	RobotDrive _drive = new RobotDrive(_frontLeftMotor, _rearLeftMotor, _frontRightMotor, _rearRightMotor);
 
@@ -122,9 +122,17 @@ public class Robot extends SampleRobot {
 	    
 	    	_drive.arcadeDrive(forward, -turn);
 
-	    	if(_joy.getRawButton(3)){
-	    		_placeHolder1.set(0.1);
+	    	if(_joy.getRawButton(10)){
+	    		_climber.set(0.5);
 	    	}
+			
+		if(_joy.getRawButton(1)){
+			_ballIntake.set(0.5);
+		}
+		
+		if(_joy.getRawButton(2)){//or 3 depending on driver preference
+			_ballShooter.set(0.5);
+		}
 	    	
 			/*
 	   	if (pressureGood) {
