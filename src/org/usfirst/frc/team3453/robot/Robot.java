@@ -41,7 +41,7 @@ public class Robot extends IterativeRobot {
 	CANTalon _fuelIntake = new CANTalon(6);
 	CANTalon _fuelShooter = new CANTalon(7);
 	
-	RobotDrive _drive = new RobotDrive(_frontLeftMotor, _rearLeftMotor, _frontRightMotor, _rearRightMotor);
+	RobotDrive _drive = new RobotDrive(_frontRightMotor, _rearRightMotor, _frontLeftMotor, _rearLeftMotor);
 
 	Joystick _gamepad = new Joystick(0);
 	Joystick _joy = new Joystick(1);
@@ -55,8 +55,8 @@ public class Robot extends IterativeRobot {
 	//Solenoid sol_11 = new Solenoid(0);
 	
 	SendableChooser chooser;
-    final String defaultAuto = "Default";
-    final String customAuto = "My Auto";
+	final String defaultAuto = "Default";
+	final String customAuto = "My Auto";
 	
 	CameraServer server = CameraServer.getInstance();
 	UsbCamera cam0 = new UsbCamera("cam0",0);
@@ -76,16 +76,16 @@ public class Robot extends IterativeRobot {
 		driveNeutral();
 		//sol_11.set(false);
 		
-        chooser = new SendableChooser();
-        chooser.addDefault("Default Auto", defaultAuto);
-        chooser.addObject("My Auto", customAuto);
-        SmartDashboard.putData("Auto modes", chooser);
+		chooser = new SendableChooser();
+		chooser.addDefault("Default Auto", defaultAuto);
+		chooser.addObject("My Auto", customAuto);
+		SmartDashboard.putData("Auto modes", chooser);
 		
 		//startAutomaticCapture(cam0, 0);//string name(the one you call it by, device id number)
 		
-        new Thread(() -> {
-            UsbCamera camera = CameraServer.getInstance().startAutomaticCapture();
-            camera.setResolution(640, 480);
+		new Thread(() -> {
+			UsbCamera camera = CameraServer.getInstance().startAutomaticCapture();
+			camera.setResolution(640, 480);
             
             /*
             CvSink cvSink = CameraServer.getInstance().getVideo();
@@ -100,7 +100,7 @@ public class Robot extends IterativeRobot {
                 outputStream.putFrame(output);
             }
             */
-        }).start();
+		}).start();
         
 		
 	}
@@ -120,31 +120,32 @@ public class Robot extends IterativeRobot {
 	@Override
 	public void autonomousPeriodic() {
 		// Drive for 2 seconds
+		/*
 		if (timer.get() < 2.0) {
 			_drive.drive(-0.5, 0.0); // drive forwards half speed
 		} else {
 			_drive.drive(0.0, 0.0); // stop robot
-		}
+		}  */
 		
-    	String autoSelected = (String) chooser.getSelected();
-//		String autoSelected = SmartDashboard.getString("Auto Selector", defaultAuto);
+		String autoSelected = (String) chooser.getSelected();
+		//String autoSelected = SmartDashboard.getString("Auto Selector", defaultAuto);
 		System.out.println("Auto selected: " + autoSelected);
-    	
-    	switch(autoSelected) {
-    	case customAuto:
-            _drive.setSafetyEnabled(false);
-            _drive.drive(-0.5, 1.0); // spin at half speed
-            Timer.delay(2.0);		 //    for 2 seconds
-            _drive.drive(0.0, 0.0);	 // stop robot
-            break;
-    	case defaultAuto:
-    	default:
-            _drive.setSafetyEnabled(false);
-            _drive.drive(-0.5, 0.0); // drive forwards half speed
-            Timer.delay(2.0);		 //    for 2 seconds
-            _drive.drive(0.0, 0.0);	 // stop robot
-            break;
-    	}
+
+		switch(autoSelected) {
+		case customAuto:
+			_drive.setSafetyEnabled(false);
+			_drive.drive(-0.5, 1.0); // spin at half speed
+			Timer.delay(2.0);		 //    for 2 seconds
+			_drive.drive(0.0, 0.0);	 // stop robot
+			break;
+		case defaultAuto:
+		default:
+			_drive.setSafetyEnabled(false);
+			_drive.drive(-0.5, 0.0); // drive forwards half speed
+			Timer.delay(2.0);		 //    for 2 seconds
+			_drive.drive(0.0, 0.0);	 // stop robot
+			break;
+		}
 	}
 
 	/**
@@ -210,19 +211,19 @@ public class Robot extends IterativeRobot {
     		// rescale and limit max climber motor output to 0.7
     		climberInput = climberInput * 0.7;  
  
-    		_climber.set(climberInput); // input will turn motor clockwise
+    		_climber.set(-climberInput); // input will turn motor clockwise
     	} else {
     		_climber.set(0);
     	}
     	
     	if (trigger) {
-    		_fuelIntake.set(-0.75);
+    		_fuelIntake.set(-0.95);
     	} else {
     		_fuelIntake.set(0);
     	}
     	
     	if(shooter) {
-    		_fuelShooter.set(0.5);//placeholder for test
+    		_fuelShooter.set(-0.75);//placeholder for test
     	} else {
     		_fuelShooter.set(0);
     	}
