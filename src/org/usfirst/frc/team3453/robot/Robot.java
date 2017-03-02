@@ -2,15 +2,24 @@ package org.usfirst.frc.team3453.robot;
 
 import edu.wpi.first.wpilibj.IterativeRobot;
 
+import com.kauailabs.navx.frc.AHRS;
+import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.SPI;
+import edu.wpi.first.wpilibj.I2C;
+import edu.wpi.first.wpilibj.SerialPort;
+
 import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.RobotDrive;
-import edu.wpi.first.wpilibj.Timer;
-import edu.wpi.first.wpilibj.livewindow.LiveWindow;
-import edu.wpi.first.wpilibj.Compressor;
+import edu.wpi.first.wpilibj.SpeedController;
 import com.ctre.CANTalon;
+import edu.wpi.first.wpilibj.Spark;
+import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj.Compressor;
 import edu.wpi.first.wpilibj.DoubleSolenoid;
+import edu.wpi.first.wpilibj.livewindow.LiveWindow;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+
 import edu.wpi.first.wpilibj.CameraServer;
 import edu.wpi.cscore.UsbCamera;
 
@@ -30,29 +39,48 @@ public class Robot extends IterativeRobot {
 	public boolean airOn = false;
 	public int currentCount = 0;
 	
+	private AHRS ahrs;
 	
 	/* talons for arcade drive */
-	CANTalon _frontLeftMotor = new CANTalon(1); 		/* device IDs here (1 of 2) */
-	CANTalon _rearLeftMotor = new CANTalon(2);
-	CANTalon _frontRightMotor = new CANTalon(3);
-	CANTalon _rearRightMotor = new CANTalon(4);
-	
+/*
+    // Competition use
+	SpeedController _frontLeftMotor = new CANTalon(1); 		//device IDs here (1 of 2)
+	SpeedController _rearLeftMotor = new CANTalon(2);
+	SpeedController _frontRightMotor = new CANTalon(3);
+	SpeedController _rearRightMotor = new CANTalon(4);
+*/
+	// Practice Robot use
+	SpeedController _frontLeftMotor = new Spark(0); 		//device IDs here (1 of 2)
+	SpeedController _rearLeftMotor = new Spark(1);
+	SpeedController _frontRightMotor = new Spark(2);
+	SpeedController _rearRightMotor = new Spark(3);
+/*
+    // Competition use
 	CANTalon _climber = new CANTalon(5);
 	CANTalon _fuelIntake = new CANTalon(6);
 	CANTalon _fuelShooter = new CANTalon(7);
+*/
+/********************************************
+ *  Replace with code below for practice bot
+ ********************************************/	
+
+	Spark _climber = new Spark(5);
+	Spark _fuelIntake = new Spark(6);
+	Spark _fuelShooter = new Spark (7);
+
 	
-	RobotDrive _drive = new RobotDrive(_frontRightMotor, _rearRightMotor, _frontLeftMotor, _rearLeftMotor);
+	//RobotDrive _drive = new RobotDrive(_frontRightMotor, _rearRightMotor, _frontLeftMotor, _rearLeftMotor);
+	RobotDrive _drive = new RobotDrive(_frontLeftMotor, _rearLeftMotor, _frontRightMotor, _rearRightMotor);
 
 	Joystick _gamepad = new Joystick(0);
 	Joystick _joy = new Joystick(1);
 	
-	RobotDrive myRobot = new RobotDrive(0, 1);
+	//RobotDrive myRobot = new RobotDrive(0, 1);
 	Timer timer = new Timer();
 	
 	Compressor c = new Compressor(0);
 	DoubleSolenoid sol_01 = new DoubleSolenoid(0, 0, 1);
 	DoubleSolenoid sol_23 = new DoubleSolenoid(0, 2, 3);
-	//Solenoid sol_11 = new Solenoid(0);
 	
 	SendableChooser chooser;
 	final String defaultAuto = "Default";
@@ -71,6 +99,13 @@ public class Robot extends IterativeRobot {
 	
 	@Override
 	public void robotInit() {
+		
+		// use if drive motor/gearbox runs backwards.
+		//_drive.setInvertedMotor(RobotDrive.MotorType.kFrontLeft,true);
+		//_drive.setInvertedMotor(RobotDrive.MotorType.kFrontRight, true);
+		//_drive.setInvertedMotor(RobotDrive.MotorType.kRearLeft, true);
+		//_drive.setInvertedMotor(RobotDrive.MotorType.kRearRight, true);
+		
 		c.setClosedLoopControl(true);
 		pressureGood = false;
 		driveNeutral();
@@ -102,6 +137,17 @@ public class Robot extends IterativeRobot {
             */
 		}).start();
         
+		try {
+	          /* Communicate w/navX-MXP via the MXP SPI Bus.                                     */
+	          /* Alternatively:  I2C.Port.kMXP, SerialPort.Port.kMXP or SerialPort.Port.kUSB     */
+	          /* See http://navx-mxp.kauailabs.com/guidance/selecting-an-interface/ for details. */
+	          ahrs = new AHRS(SPI.Port.kMXP); 
+	          
+		} catch (RuntimeException ex ) {
+			DriverStation.reportError("Error instantiating navX-MXP:  " + ex.getMessage(), true);
+		}
+		
+		// put Gyro Initialization in here
 		
 	}
 
@@ -161,10 +207,12 @@ public class Robot extends IterativeRobot {
 		_frontRightMotor.set(0);
 		_rearLeftMotor.set(0);
 		_rearRightMotor.set(0);
+	
+	/*	
 		_climber.set(0);
 		_fuelIntake.set(0);
 		_fuelShooter.set(0);
-		
+	*/
 	}
 
 	/**
@@ -204,7 +252,7 @@ public class Robot extends IterativeRobot {
     	double input = _joy.getY();  // push forward is negative values
     	boolean trigger = _joy.getRawButton(1); // trigger
     	boolean shooter = _joy.getRawButton(3); // top
-    	
+   	
     	double climberInput = Math.abs(input);
     	if (_joy.getRawButton(2) && (climberInput > 0.15) ){  // joystick button 3
     		
@@ -227,7 +275,7 @@ public class Robot extends IterativeRobot {
     	} else {
     		_fuelShooter.set(0);
     	}
-    	
+ 
 		/*
    	if (pressureGood) {
     		currentCount++;
@@ -254,6 +302,21 @@ public class Robot extends IterativeRobot {
 	@Override
 	public void testPeriodic() {
 		LiveWindow.run();
+	}
+	
+	@Override
+	public void disabledInit() {
+		
+	}
+	
+	@Override
+	public void disabledPeriodic() {
+		
+	}
+	
+	@Override
+	public void robotPeriodic() {
+		// exactly 20ms tasks in here
 	}
 	
 	public void driveLo() {
