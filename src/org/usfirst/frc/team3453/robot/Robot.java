@@ -35,44 +35,26 @@ import edu.wpi.cscore.UsbCamera;
  * directory.
  */
 public class Robot extends IterativeRobot {
+	// true for Competition bot, false for Practice bot
+	private boolean isCompetitionBot = false;
 	
-	public boolean pressureGood = false;
+	private boolean pressureGood = false;
 	
-	public boolean airOn = false;
-	public int currentCount = 0;
+	private boolean airOn = false;
+	private int currentCount = 0;
 	
 	private navxmxp_data_monitor ahrs;
 	
-	/* talons for arcade drive */
-/*
-    // Competition use
-	SpeedController _frontLeftMotor = new CANTalon(1); 		//device IDs here (1 of 2)
-	SpeedController _rearLeftMotor = new CANTalon(2);
-	SpeedController _frontRightMotor = new CANTalon(3);
-	SpeedController _rearRightMotor = new CANTalon(4);
-*/
-	// Practice Robot use
-	SpeedController _frontLeftMotor = new Spark(0); 		//device IDs here (1 of 2)
-	SpeedController _rearLeftMotor = new Spark(1);
-	SpeedController _frontRightMotor = new Spark(2);
-	SpeedController _rearRightMotor = new Spark(3);
-/*
-    // Competition use
-	CANTalon _climber = new CANTalon(5);
-	CANTalon _fuelIntake = new CANTalon(6);
-	CANTalon _fuelShooter = new CANTalon(7);
-*/
-/********************************************
- *  Replace with code below for practice bot
- ********************************************/	
+	SpeedController _frontLeftMotor;
+	SpeedController _rearLeftMotor;
+	SpeedController _frontRightMotor;
+	SpeedController _rearRightMotor;
 
-	Victor _climber = new Victor(5);
-	Victor _fuelIntake = new Victor(6);
-	Victor _fuelShooter = new Victor(7);
+	SpeedController _climber;
+	SpeedController _fuelIntake;
+	SpeedController _fuelShooter;
 
-	
-	//RobotDrive _drive = new RobotDrive(_frontRightMotor, _rearRightMotor, _frontLeftMotor, _rearLeftMotor);
-	RobotDrive _drive = new RobotDrive(_frontLeftMotor, _rearLeftMotor, _frontRightMotor, _rearRightMotor);
+	RobotDrive _drive;
 
 	Joystick _gamepad = new Joystick(0);
 	Joystick _joy = new Joystick(1);
@@ -103,12 +85,47 @@ public class Robot extends IterativeRobot {
 	@Override
 	public void robotInit() {
 		
+		if (isCompetitionBot) {
+		    // Competition use - Talon SRXs
+
+			_frontLeftMotor  = new CANTalon(1);     //device IDs here (1 of 2)
+			_rearLeftMotor   = new CANTalon(2);
+			_frontRightMotor = new CANTalon(3);
+			_rearRightMotor  = new CANTalon(4);
+			
+			// set all Talon SRX drive motors to Coast from software
+			((CANTalon) _frontLeftMotor).enableBrakeMode(false);
+			((CANTalon) _rearLeftMotor).enableBrakeMode(false);
+			((CANTalon) _frontRightMotor).enableBrakeMode(false);
+			((CANTalon) _rearRightMotor).enableBrakeMode(false);
+			
+		    // Competition use
+			_climber = new CANTalon(5);
+			_fuelIntake = new CANTalon(6);
+			_fuelShooter = new CANTalon(7);
+			
+		} else {
+			// Practice Robot use - Sparks
+
+			_frontLeftMotor  = new Spark(0); 		//device IDs here (1 of 2)
+			_rearLeftMotor   = new Spark(1);
+			_frontRightMotor = new Spark(2);
+			_rearRightMotor  = new Spark(3);
+			
+			_climber = new Victor(5);
+			_fuelIntake = new Victor(6);
+			_fuelShooter = new Victor(7);
+		}
+		
+		//_drive = new RobotDrive(_frontRightMotor, _rearRightMotor, _frontLeftMotor, _rearLeftMotor);
+		_drive = new RobotDrive(_frontLeftMotor, _rearLeftMotor, _frontRightMotor, _rearRightMotor);
+		
 		// use if drive motor/gearbox runs backwards.
 		_drive.setInvertedMotor(RobotDrive.MotorType.kFrontLeft,true);
 		_drive.setInvertedMotor(RobotDrive.MotorType.kFrontRight, true);
 		_drive.setInvertedMotor(RobotDrive.MotorType.kRearLeft, true);
 		_drive.setInvertedMotor(RobotDrive.MotorType.kRearRight, true);
-		
+				
 		c.setClosedLoopControl(true);
 		pressureGood = false;
 		driveNeutral();
@@ -158,6 +175,18 @@ public class Robot extends IterativeRobot {
 		timer.start();
 		ahrs.zeroYaw();
 		count = 0;
+		
+		c.setClosedLoopControl(true);
+		pressureGood = false;
+		driveLo();
+		_frontLeftMotor.set(0);
+		_frontRightMotor.set(0);
+		_rearLeftMotor.set(0);
+		_rearRightMotor.set(0);
+		
+		_climber.set(0);
+		_fuelIntake.set(0);
+		_fuelShooter.set(0);		
 	}
 
 	/**
@@ -214,16 +243,15 @@ public class Robot extends IterativeRobot {
 		c.setClosedLoopControl(true);
 		pressureGood = false;
 		driveLo();
+		_drive.drive(0.0, 0.0); // stop drive if still running
 		_frontLeftMotor.set(0);
 		_frontRightMotor.set(0);
 		_rearLeftMotor.set(0);
 		_rearRightMotor.set(0);
-	
-	/*	
+		
 		_climber.set(0);
 		_fuelIntake.set(0);
 		_fuelShooter.set(0);
-	*/
 	}
 
 	/**
@@ -267,7 +295,7 @@ public class Robot extends IterativeRobot {
     	boolean shooter = _joy.getRawButton(3); // top
    	
     	double climberInput = Math.abs(input);
-    	if (_joy.getRawButton(2) && (climberInput > 0.15) ){  // joystick button 3
+    	if (_joy.getRawButton(2) && (climberInput > 0.15) ){  // joystick button 2
     		
     		// rescale and limit max climber motor output to 0.7
     		climberInput = climberInput * 0.7;  
@@ -319,7 +347,18 @@ public class Robot extends IterativeRobot {
 	
 	@Override
 	public void disabledInit() {
+		ahrs.zeroYaw();
+		c.setClosedLoopControl(false);
+		pressureGood = false;
+		driveLo();
+		_frontLeftMotor.set(0);
+		_frontRightMotor.set(0);
+		_rearLeftMotor.set(0);
+		_rearRightMotor.set(0);
 		
+		_climber.set(0);
+		_fuelIntake.set(0);
+		_fuelShooter.set(0);		
 	}
 	
 	@Override
