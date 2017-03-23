@@ -24,6 +24,13 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
 import edu.wpi.first.wpilibj.CameraServer;
 import edu.wpi.cscore.UsbCamera;
+import org.opencv.core.Rect;
+import org.opencv.imgproc.Imgproc;
+import edu.wpi.first.wpilibj.vision.VisionRunner;
+import edu.wpi.first.wpilibj.vision.VisionThread;
+
+import edu.wpi.first.wpilibj.PIDController;
+import edu.wpi.first.wpilibj.PIDOutput;
 
 
 
@@ -34,7 +41,7 @@ import edu.wpi.cscore.UsbCamera;
  * creating this project, you must also update the manifest file in the resource
  * directory.
  */
-public class Robot extends IterativeRobot {
+public class Robot extends IterativeRobot implements PIDOutput {
 	// true for Competition bot, false for Practice bot
 	private boolean isCompetitionBot = false;
 	
@@ -42,6 +49,7 @@ public class Robot extends IterativeRobot {
 	
 	private boolean airOn = false;
 	private int currentCount = 0;
+	private int autonomousMasterCounter = 0;
 	
 	private navxmxp_data_monitor ahrs;
 	
@@ -67,12 +75,45 @@ public class Robot extends IterativeRobot {
 	DoubleSolenoid sol_01 = new DoubleSolenoid(0, 0, 1);
 	DoubleSolenoid sol_23 = new DoubleSolenoid(0, 2, 3);
 	
-	SendableChooser chooser;
-	final String defaultAuto = "Default";
-	final String customAuto = "My Auto";
+	SendableChooser<String> autoChooser;
+	final String defaultAutoFwd = "DefaultFwd";
+	final String customAutoBack = "Back";
+	final String customAutoShooter = "Shooter";
+	final String customAutoAllianceWag = "Alliance Wag";
+	final String visionChase = "Vision Chase";
+	String autoSelected;
+	
+	SendableChooser<String> allianceChooser;
+	final String defaultAlliance = "red";
+	final String blueAlliance = "blue";
+	String allianceSelected;
 	
 	CameraServer server; //CameraServer.getInstance();
-	UsbCamera cam0;      //new UsbCamera("cam0",0);
+	UsbCamera camera;      //new UsbCamera("cam0",0);
+	
+	
+	private static final int IMG_WIDTH = 320;
+	private static final int IMG_HEIGHT = 240;
+	
+	private VisionThread visionThread;
+	private double centerX = 0.0;
+	private double turn = 0.0;
+	
+	private final Object imgLock = new Object();
+	
+	PIDController turnController;
+	double rotateToAngleRate;
+	static final double kP = 0.03;
+	static final double kI = 0.00;
+	static final double kD = 0.00;
+	static final double kF = 0.00;
+	  
+	/* This tuning parameter indicates how close to "on target" the    */
+	/* PID Controller will attempt to get.                             */
+
+	static final double kToleranceDegrees = 2.0f;
+	
+	boolean rotateToAngle = false;
 	
 	
 	/**
@@ -131,20 +172,31 @@ public class Robot extends IterativeRobot {
 		driveNeutral();
 		//sol_11.set(false);
 		
-		chooser = new SendableChooser();
-		chooser.addDefault("Default Auto", defaultAuto);
-		chooser.addObject("My Auto", customAuto);
-		SmartDashboard.putData("Auto modes", chooser);
+		autoChooser = new SendableChooser<String>();
+		autoChooser.addDefault("Default Fwd", defaultAutoFwd);
+		autoChooser.addObject("Auto Back", customAutoBack);
+		autoChooser.addObject("Auto Shooter", customAutoShooter);
+		autoChooser.addObject("Alliance Wag", customAutoAllianceWag);
+		autoChooser.addObject("Vision Chase", visionChase);
+		SmartDashboard.putData("Auto modes", autoChooser);
+		
+		allianceChooser = new SendableChooser<String>();
+		allianceChooser.addDefault("Red ", defaultAlliance);
+		allianceChooser.addObject("Blue ", blueAlliance);
+		SmartDashboard.putData("Alliance", allianceChooser);
+		
 		
 		//startAutomaticCapture(cam0, 0);//string name(the one you call it by, device id number)
 		
-		new Thread(() -> {
-			UsbCamera camera = CameraServer.getInstance().startAutomaticCapture();
-			camera.setResolution(320, 240);
+//		new Thread(() -> {
+			camera = CameraServer.getInstance().startAutomaticCapture();
+			camera.setResolution(IMG_WIDTH, IMG_HEIGHT);
 			camera.setBrightness(20);
 			camera.setExposureAuto();
+			camera.setExposureManual(-144);
 			camera.setFPS(25);
 			camera.setWhiteBalanceAuto();
+			camera.setWhiteBalanceManual(3);
 			
             
             /*
@@ -160,9 +212,25 @@ public class Robot extends IterativeRobot {
                 outputStream.putFrame(output);
             }
             */
-		}).start();
+//		}).start();
+		
+		try {
+		    visionThread = new VisionThread(camera, new GripPipeline(), pipeline -> {
+		        if (!pipeline.filterContoursOutput().isEmpty()) {
+		            Rect r = Imgproc.boundingRect(pipeline.filterContoursOutput().get(0));
+		            synchronized (imgLock) {
+		                centerX = r.x + (r.width / 2);
+		            }
+		        }
+		    });
+		    visionThread.start();
+		} catch (RuntimeException ex ) {
+			DriverStation.reportError("Error instantiating vision thread:  " + ex.getMessage(), true);
+		}  
         
 		ahrs = new navxmxp_data_monitor();
+		
+		initiateTurnController();
 		
 	}
 
@@ -175,6 +243,7 @@ public class Robot extends IterativeRobot {
 		timer.start();
 		ahrs.zeroYaw();
 		count = 0;
+		autonomousMasterCounter = 0;
 		
 		c.setClosedLoopControl(true);
 		pressureGood = false;
@@ -187,6 +256,16 @@ public class Robot extends IterativeRobot {
 		_climber.set(0);
 		_fuelIntake.set(0);
 		_fuelShooter.set(0);		
+		
+		initiateTurnController ();
+		rotateToAngle = false;
+		
+		autoSelected = (String) autoChooser.getSelected();
+		//String autoSelected = SmartDashboard.getString("Auto Selector", defaultAuto);
+		System.out.println("Auto selected: " + autoSelected);
+		
+		allianceSelected = (String) allianceChooser.getSelected();
+		System.out.println("Alliance selected: " + allianceSelected);
 	}
 
 	/**
@@ -197,6 +276,27 @@ public class Robot extends IterativeRobot {
 		
 		ahrs.printStats();
 		count++;
+		autonomousMasterCounter++;
+		
+		// runClimber to break tape, release gear holder
+		if (autonomousMasterCounter < 50) {
+			//DriverStation.reportWarning("runClimber in autonomous", false);
+			runClimber(0.5);
+		} else {
+			stopClimber();
+			//DriverStation.reportWarning("stopClimber in autonomous", false);
+			
+		}
+		if ((autonomousMasterCounter > 755) && !(autoSelected.equals(visionChase)) ){
+			// 750 * 20ms = 15secs of autonomous period
+			_drive.drive(0.0, 0.0);
+			stopClimber();
+			stopIntake();
+			DriverStation.reportWarning("Autonomous routine exceeded 15 seconds", false);
+			return;
+		}
+		
+		// from right side, drive 100% forward 84 count (1.68s=121"), turn left 60deg, fwd 6 count (.125s=9")
 		
 		// Drive for 2 seconds
 		/*
@@ -206,21 +306,39 @@ public class Robot extends IterativeRobot {
 			_drive.drive(0.0, 0.0); // stop robot
 		}  */
 		
-		String autoSelected = (String) chooser.getSelected();
-		//String autoSelected = SmartDashboard.getString("Auto Selector", defaultAuto);
-		System.out.println("Auto selected: " + autoSelected);
 
 		switch(autoSelected) {
-		case customAuto:
+		case customAutoBack:
 			_drive.setSafetyEnabled(false);
 			if (count < 100) {
-				_drive.drive(-0.5, 1.0); // spin at half speed
+				_drive.drive(0.5, 0.0); // spin at half speed
 			} else {
 				//Timer.delay(2.0);		 //    for 2 seconds
 				_drive.drive(0.0, 0.0);	 // stop robot
 			}
 			break;
-		case defaultAuto:
+		case customAutoShooter:
+			_drive.setSafetyEnabled(false);
+			if (count < 700) {
+				runShooter();
+			} else {
+				stopShooter();
+			}
+			break;
+		case customAutoAllianceWag:
+			_drive.setSafetyEnabled(false);
+			break;
+		case visionChase:
+			_drive.setSafetyEnabled(false);
+			double centerX;
+			synchronized (imgLock) {
+				centerX = this.centerX;
+			}
+			turn = centerX - (IMG_WIDTH / 2);
+//			_drive.arcadeDrive(-0.6, turn * 0.005);
+			_drive.arcadeDrive(0, turn * 0.005);
+			break;
+		case defaultAutoFwd:
 		default:
 			_drive.setSafetyEnabled(false);
 			if (count < 100) { // spin for 2 seconds
@@ -252,6 +370,9 @@ public class Robot extends IterativeRobot {
 		_climber.set(0);
 		_fuelIntake.set(0);
 		_fuelShooter.set(0);
+		
+		initiateTurnController ();
+		rotateToAngle = false;
 	}
 
 	/**
@@ -278,14 +399,48 @@ public class Robot extends IterativeRobot {
     		driveLo();
     	}
     	
-    	
+    	if (turnController != null) {
+    		
+	    	if (_gamepad.getRawButton(3)) { // button X - to the left
+	    		turnController.setSetpoint(-90.0f);
+	    		rotateToAngle = true;
+	    	}
+	    	if (_gamepad.getRawButton(1)) { // button A - to the down
+	    		turnController.setSetpoint(179.9f);
+	    		rotateToAngle = true;
+	    	}
+	    	if (_gamepad.getRawButton(2)) { // button B - to the right
+	    		turnController.setSetpoint(90.0f);
+	    		rotateToAngle = true;
+	    	}
+	    	if (_gamepad.getRawButton(4)) { // button Y - to the up
+	    		turnController.setSetpoint(0.0f);
+	    		rotateToAngle = true;
+	    	}
+	        double currentRotationRate;
+	        if ( rotateToAngle ) {
+	            turnController.enable();
+	            currentRotationRate = rotateToAngleRate;
+	            _drive.arcadeDrive(forward, currentRotationRate);
+	        } else {
+	            turnController.disable();
+	            currentRotationRate = 10.9;
+	        }
+	        
+	        if ( Math.abs(turn) > 0.15) {
+	        	turnController.disable();
+	        	rotateToAngle = false;
+	    	}
+    	}
     	    	
-    	if (_gamepad.getRawButton(1)){ // button X
+    	if (_gamepad.getRawButton(1)){ // button A
     		// practice buttons
-			_rearRightMotor.set(0.1);
-			_frontRightMotor.set(0.1);
+//			_rearRightMotor.set(0.1);
+//			_frontRightMotor.set(0.1);
 	    } else {
-	    	_drive.arcadeDrive(forward, turn);
+	    	if (! rotateToAngle) {
+	    		_drive.arcadeDrive(forward, turn);
+	    	}
 	    }
 	
 
@@ -300,21 +455,22 @@ public class Robot extends IterativeRobot {
     		// rescale and limit max climber motor output to 0.7
     		climberInput = climberInput * 0.7;  
  
-    		_climber.set(-climberInput); // input will turn motor clockwise
+    		runClimber(-climberInput); // input will turn motor clockwise
     	} else {
-    		_climber.set(0);
+    		stopClimber();
+    		
     	}
     	
-    	if (trigger) {
-    		_fuelIntake.set(-0.95);
+    	if (trigger) {    // Operator trigger is Intake
+    		runIntake();
     	} else {
-    		_fuelIntake.set(0);
+    		stopIntake();
     	}
     	
-    	if(shooter) {
-    		_fuelShooter.set(-0.75);//placeholder for test
+    	if (shooter) {    
+    		runShooter();  //placeholder for test
     	} else {
-    		_fuelShooter.set(0);
+    		stopShooter();
     	}
  
 		/*
@@ -385,4 +541,59 @@ public class Robot extends IterativeRobot {
 		sol_01.set(DoubleSolenoid.Value.kOff);
 		sol_23.set(DoubleSolenoid.Value.kOff);
 	}
+	
+	public void runClimber(double speed) {
+		speed = Math.abs(speed);
+		_climber.set(-speed);       // input will turn motor clockwise
+		
+	}
+	
+	public void stopClimber() {
+		_climber.set(0);
+	}
+	
+	public void runIntake() {
+		_fuelIntake.set(1);
+	}
+	
+	public void stopIntake() {
+		_fuelIntake.set(0);
+	}
+
+	public void runShooter(double speed) {
+		speed = Math.abs(speed);
+		_fuelShooter.set(-speed);     //placeholder for test
+	}
+
+	public void runShooter() {
+		runShooter(-0.8);            // doesn't matter if you put pos or neg int here
+	}
+	
+	public void stopShooter() {
+		runShooter(0);
+	}
+	
+	  @Override
+	  /* This function is invoked periodically by the PID Controller, */
+	  /* based upon navX-MXP yaw angle input and PID Coefficients.    */
+	  public void pidWrite(double output) {
+	      rotateToAngleRate = output;
+	  }
+	  
+	  public void initiateTurnController () {
+		  
+		  if (ahrs.isValid() && (turnController == null)) {
+			turnController = new PIDController(kP, kI, kD, kF, ahrs.getAHRS(), this);
+			turnController.setInputRange(-180.0f,  180.0f);
+			turnController.setOutputRange(-1.0, 1.0);
+			turnController.setAbsoluteTolerance(kToleranceDegrees);
+			turnController.setContinuous(true);
+			
+			/* Add the PID Controller to the Test-mode dashboard, allowing manual  */
+		    /* tuning of the Turn Controller's P, I and D coefficients.            */
+		    /* Typically, only the P value needs to be modified.                   */
+		    LiveWindow.addActuator("DriveSystem", "RotateController", turnController);
+		  }
+	  }
+
 }

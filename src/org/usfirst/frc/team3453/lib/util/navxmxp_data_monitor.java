@@ -25,6 +25,7 @@ public class navxmxp_data_monitor {
 	          } else {
 	        	  DriverStation.reportError("Instantiated navX-MXP, but could not connect", true);
 	          }
+	          
 		} catch (RuntimeException ex ) {
 			DriverStation.reportError("Error instantiating navX-MXP:  " + ex.getMessage(), true);
 		}
@@ -40,6 +41,23 @@ public class navxmxp_data_monitor {
 		}
 	}
 	
+	public AHRS getAHRS() {
+		return ahrs;
+	}
+	
+	public boolean isValid() {
+		try {
+			if (ahrs.isConnected()) {
+				valid = true;
+			} else {
+				DriverStation.reportError("navX-MXP could not connect", true);
+			}
+		} catch (RuntimeException ex ) {
+			DriverStation.reportError("Failed call navX-MXP.isConnected() :  " + ex.getMessage(), true);
+		}
+		return valid;
+	}
+	
     /**
      * Display navX MXP Sensor Data on Smart Dashboard
      */
@@ -52,7 +70,7 @@ public class navxmxp_data_monitor {
             //if ( zero_yaw_pressed ) {
             //    ahrs.zeroYaw();
             //}
-    	if (valid) {
+    	if (isValid()) {
             /* Display 6-axis Processed Angle Data                                      */
             SmartDashboard.putBoolean(  "IMU_Connected",        ahrs.isConnected());
             SmartDashboard.putBoolean(  "IMU_IsCalibrating",    ahrs.isCalibrating());
