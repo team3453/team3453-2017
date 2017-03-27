@@ -15,6 +15,7 @@ import edu.wpi.first.wpilibj.SpeedController;
 import com.ctre.CANTalon;
 import edu.wpi.first.wpilibj.Spark;
 import edu.wpi.first.wpilibj.Victor;
+import edu.wpi.first.wpilibj.Talon;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.Compressor;
 import edu.wpi.first.wpilibj.DoubleSolenoid;
@@ -53,6 +54,7 @@ public class Robot extends IterativeRobot implements PIDOutput {
 	
 	private navxmxp_data_monitor ahrs;
 	
+	private boolean haveCAN = false;
 	SpeedController _frontLeftMotor;
 	SpeedController _rearLeftMotor;
 	SpeedController _frontRightMotor;
@@ -77,10 +79,12 @@ public class Robot extends IterativeRobot implements PIDOutput {
 	
 	SendableChooser<String> autoChooser;
 	final String defaultAutoFwd = "DefaultFwd";
+	final String autoAllianceGearHang = "AllianceGearHang";
 	final String customAutoBack = "Back";
 	final String customAutoShooter = "Shooter";
 	final String customAutoAllianceWag = "Alliance Wag";
 	final String visionChase = "Vision Chase";
+	
 	String autoSelected;
 	
 	SendableChooser<String> allianceChooser;
@@ -135,10 +139,8 @@ public class Robot extends IterativeRobot implements PIDOutput {
 			_rearRightMotor  = new CANTalon(4);
 			
 			// set all Talon SRX drive motors to Coast from software
-			((CANTalon) _frontLeftMotor).enableBrakeMode(false);
-			((CANTalon) _rearLeftMotor).enableBrakeMode(false);
-			((CANTalon) _frontRightMotor).enableBrakeMode(false);
-			((CANTalon) _rearRightMotor).enableBrakeMode(false);
+			haveCAN = true;
+			CAN_CoastMode();
 			
 		    // Competition use
 			_climber = new CANTalon(5);
@@ -146,8 +148,24 @@ public class Robot extends IterativeRobot implements PIDOutput {
 			_fuelShooter = new CANTalon(7);
 			
 		} else {
-			// Practice Robot use - Sparks
-
+			
+			// Practice Robot v2 use - Talon SRX
+			
+			_frontLeftMotor  = new CANTalon(1);     //device IDs here (1 of 2)
+			_rearLeftMotor   = new CANTalon(2);
+			_frontRightMotor = new CANTalon(3);
+			_rearRightMotor  = new CANTalon(4);
+			
+			// set all Talon SRX drive motors to Coast from software
+			haveCAN = true;
+			CAN_CoastMode();
+			
+			_climber = new Talon(0);
+			_fuelIntake = new Talon(1);
+			_fuelShooter = new Talon(2);
+						
+			// Practice Robot v1 use - Sparks
+/*
 			_frontLeftMotor  = new Spark(0); 		//device IDs here (1 of 2)
 			_rearLeftMotor   = new Spark(1);
 			_frontRightMotor = new Spark(2);
@@ -156,6 +174,9 @@ public class Robot extends IterativeRobot implements PIDOutput {
 			_climber = new Victor(5);
 			_fuelIntake = new Victor(6);
 			_fuelShooter = new Victor(7);
+*/
+			
+
 		}
 		
 		//_drive = new RobotDrive(_frontRightMotor, _rearRightMotor, _frontLeftMotor, _rearLeftMotor);
@@ -174,9 +195,10 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		
 		autoChooser = new SendableChooser<String>();
 		autoChooser.addDefault("Default Fwd", defaultAutoFwd);
+		autoChooser.addObject("Hang Gear, Fuel Goal",  autoAllianceGearHang);
 		autoChooser.addObject("Auto Back", customAutoBack);
 		autoChooser.addObject("Auto Shooter", customAutoShooter);
-		autoChooser.addObject("Alliance Wag", customAutoAllianceWag);
+		//autoChooser.addObject("Alliance Wag", customAutoAllianceWag);
 		autoChooser.addObject("Vision Chase", visionChase);
 		SmartDashboard.putData("Auto modes", autoChooser);
 		
@@ -259,6 +281,9 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		
 		initiateTurnController ();
 		rotateToAngle = false;
+		if (turnController != null) {
+			turnController.disable();
+		}
 		
 		autoSelected = (String) autoChooser.getSelected();
 		//String autoSelected = SmartDashboard.getString("Auto Selector", defaultAuto);
@@ -278,8 +303,8 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		count++;
 		autonomousMasterCounter++;
 		
-		// runClimber to break tape, release gear holder
-		if (autonomousMasterCounter < 50) {
+		// runClimber 2 seconds to break tape, release gear holder
+		if (autonomousMasterCounter < 100) {
 			//DriverStation.reportWarning("runClimber in autonomous", false);
 			runClimber(0.5);
 		} else {
@@ -337,20 +362,89 @@ public class Robot extends IterativeRobot implements PIDOutput {
 			turn = centerX - (IMG_WIDTH / 2);
 //			_drive.arcadeDrive(-0.6, turn * 0.005);
 			_drive.arcadeDrive(0, turn * 0.005);
+			SmartDashboard.putNumber(   "Vision Center X   ", centerX );
+			SmartDashboard.putNumber(   "Vision Center turn", turn );
 			break;
+		case autoAllianceGearHang:
+			_drive.setSafetyEnabled(false);
+			autoDriveForward(100,2.0);
+			autoTurn(1.0,-60.0);
 		case defaultAutoFwd:
 		default:
 			_drive.setSafetyEnabled(false);
-			if (count < 100) { // spin for 2 seconds
-				_drive.drive(-0.5, 0.0); // drive forwards half speed
-			} else {
-				//Timer.delay(2.0);		 //    for 2 seconds
-				_drive.drive(0.0, 0.0);	 // stop robot
-			}
+			autoDriveForward(100,2.0);
+
 			break;
 		}
 	}
 
+	private void autoDriveForward (double t, double x) {
+		boolean keepgoing = false;
+		boolean run = false;
+//		if (turnController != null) {
+		if (run) {
+			if (ahrs.getDisplacementX() < x) {
+				keepgoing = true; // keep driving straight if less than 2 meters
+			}
+		} else {
+			if (count < t) { // spin for 2 seconds
+				keepgoing = true; // keep driving straight if less than 2 seconds
+			}
+		}
+		if (keepgoing) { 
+//	    	if (turnController != null) {
+			if (run) {
+	    		turnController.setSetpoint(0.0f);
+	    		if (!turnController.isEnabled()) {
+	    			turnController.enable();
+	    		}
+	            //currentRotationRate = rotateToAngleRate;
+	            _drive.arcadeDrive(-0.5, rotateToAngleRate);			    	
+	    	} else {
+				_drive.drive(-0.5, 0.0); // drive forwards half speed
+	    	}
+		} else {
+			//Timer.delay(2.0);		 //    for 2 seconds
+			if (turnController != null) {
+	            turnController.disable();
+			}
+			_drive.drive(0.0, 0.0);	 // stop robot
+
+		}
+	}
+	private void autoTurn (double t, double angle) {
+		boolean keepgoing = false;
+		if (turnController != null) {
+			if (Math.abs(ahrs.getYaw()-Math.abs(angle)) > 1) {
+				keepgoing = true; // keep driving straight if less than 2 meters
+			}
+		} else {
+			if (count < t) { // spin for 2 seconds
+				keepgoing = true; // keep driving straight if less than 2 seconds
+			}
+		}
+		
+		if (keepgoing) { 
+	    	if (turnController != null) {
+	    		turnController.setSetpoint(angle);
+	    		if (!turnController.isEnabled()) {
+	    			turnController.enable();
+	    		}
+	            //currentRotationRate = rotateToAngleRate;
+	            _drive.arcadeDrive(-0.0, rotateToAngleRate);			    	
+	    	} else {
+				_drive.arcadeDrive(-0.0, -0.5); // drive forwards half speed with a turn
+	    	}
+		} else {
+			//Timer.delay(2.0);		 //    for 2 seconds
+			if (turnController != null) {
+	            turnController.disable();
+			}
+			_drive.drive(0.0, 0.0);	 // stop robot
+
+		}
+	}
+	
 	/**
 	 * This function is called once each time the robot enters tele-operated
 	 * mode
@@ -373,6 +467,10 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		
 		initiateTurnController ();
 		rotateToAngle = false;
+		
+		if (turnController != null) {
+			turnController.disable();
+		}
 	}
 
 	/**
@@ -393,7 +491,13 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		double forward = _gamepad.getRawAxis(1); // logitech gamepad left Y, positive is forward
     	double turn = _gamepad.getRawAxis(4); //logitech gamepad right X, positive means turn right
     
-    	if (_gamepad.getRawButton(6)){ // right shoulder
+    	if (_gamepad.getRawButton(5)) { // left shoulder
+    		CAN_BrakeMode();
+    	} else {
+    		CAN_CoastMode();
+    	}
+    	
+    	if (_gamepad.getRawButton(6)) { // right shoulder
     		driveHi();
     	} else {
     		driveLo();
@@ -544,7 +648,7 @@ public class Robot extends IterativeRobot implements PIDOutput {
 	
 	public void runClimber(double speed) {
 		speed = Math.abs(speed);
-		_climber.set(-speed);       // input will turn motor clockwise
+		_climber.set(speed);       // input will turn motor clockwise
 		
 	}
 	
@@ -562,17 +666,33 @@ public class Robot extends IterativeRobot implements PIDOutput {
 
 	public void runShooter(double speed) {
 		speed = Math.abs(speed);
-		_fuelShooter.set(-speed);     //placeholder for test
+		_fuelShooter.set(speed);     //placeholder for test
 	}
 
 	public void runShooter() {
-		runShooter(-0.8);            // doesn't matter if you put pos or neg int here
+		runShooter(0.8);            // doesn't matter if you put pos or neg int here
 	}
 	
 	public void stopShooter() {
 		runShooter(0);
 	}
 	
+	private void CAN_CoastMode () {
+		if (haveCAN) {
+			((CANTalon) _frontLeftMotor).enableBrakeMode(false);
+			((CANTalon) _rearLeftMotor).enableBrakeMode(false);
+			((CANTalon) _frontRightMotor).enableBrakeMode(false);
+			((CANTalon) _rearRightMotor).enableBrakeMode(false);
+		}
+	}
+	private void CAN_BrakeMode () {
+		if (haveCAN) {
+			((CANTalon) _frontLeftMotor).enableBrakeMode(true);
+			((CANTalon) _rearLeftMotor).enableBrakeMode(true);
+			((CANTalon) _frontRightMotor).enableBrakeMode(true);
+			((CANTalon) _rearRightMotor).enableBrakeMode(true);
+		}
+	}
 	  @Override
 	  /* This function is invoked periodically by the PID Controller, */
 	  /* based upon navX-MXP yaw angle input and PID Coefficients.    */

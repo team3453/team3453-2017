@@ -13,6 +13,7 @@ public class navxmxp_data_monitor {
 
 	private AHRS ahrs;
 	private boolean valid = false;
+	private boolean showAll = false;
 	
 	public navxmxp_data_monitor() {
 		try {
@@ -58,6 +59,22 @@ public class navxmxp_data_monitor {
 		return valid;
 	}
 	
+	public double getYaw () {
+		if (isValid()) {
+			return ahrs.getYaw();
+		} else {
+			return -1;
+		}
+	}
+	public double getDisplacementX () {
+		if (isValid()) {
+			return ahrs.getDisplacementX();
+		} else {
+			return -1;
+		}
+	}
+	
+	
     /**
      * Display navX MXP Sensor Data on Smart Dashboard
      */
@@ -83,8 +100,10 @@ public class navxmxp_data_monitor {
             
             SmartDashboard.putNumber(   "IMU_CompassHeading",   ahrs.getCompassHeading());
             
+            if (showAll) {
             /* Display 9-axis Heading (requires magnetometer calibration to be useful)  */
             SmartDashboard.putNumber(   "IMU_FusedHeading",     ahrs.getFusedHeading());
+            
 
             /* These functions are compatible w/the WPI Gyro Class, providing a simple  */
             /* path for upgrading from the Kit-of-Parts gyro to the navx MXP            */
@@ -96,6 +115,8 @@ public class navxmxp_data_monitor {
             
             SmartDashboard.putNumber(   "IMU_Accel_X",          ahrs.getWorldLinearAccelX());
             SmartDashboard.putNumber(   "IMU_Accel_Y",          ahrs.getWorldLinearAccelY());
+            }
+            
             SmartDashboard.putBoolean(  "IMU_IsMoving",         ahrs.isMoving());
             SmartDashboard.putBoolean(  "IMU_IsRotating",       ahrs.isRotating());
 
@@ -115,6 +136,7 @@ public class navxmxp_data_monitor {
             /* for advanced users.  Before using this data, please consider whether     */
             /* the processed data (see above) will suit your needs.                     */
             
+            if (showAll) {
             SmartDashboard.putNumber(   "RawGyro_X",            ahrs.getRawGyroX());
             SmartDashboard.putNumber(   "RawGyro_Y",            ahrs.getRawGyroY());
             SmartDashboard.putNumber(   "RawGyro_Z",            ahrs.getRawGyroZ());
@@ -126,6 +148,7 @@ public class navxmxp_data_monitor {
             SmartDashboard.putNumber(   "RawMag_Z",             ahrs.getRawMagZ());
             SmartDashboard.putNumber(   "IMU_Temp_C",           ahrs.getTempC());
             SmartDashboard.putNumber(   "IMU_Timestamp",        ahrs.getLastSensorTimestamp());
+            
             
             /* Omnimount Yaw Axis Information                                           */
             /* For more info, see http://navx-mxp.kauailabs.com/installation/omnimount  */
@@ -145,6 +168,7 @@ public class navxmxp_data_monitor {
             SmartDashboard.putNumber(   "QuaternionX",          ahrs.getQuaternionX());
             SmartDashboard.putNumber(   "QuaternionY",          ahrs.getQuaternionY());
             SmartDashboard.putNumber(   "QuaternionZ",          ahrs.getQuaternionZ());
+            }
             
             /* Connectivity Debugging Support                                           */
             SmartDashboard.putNumber(   "IMU_Byte_Count",       ahrs.getByteCount());
