@@ -73,6 +73,13 @@ public class navxmxp_data_monitor {
 			return -1;
 		}
 	}
+	public double getDisplacementY () {
+		if (isValid()) {
+			return ahrs.getDisplacementY();
+		} else {
+			return -1;
+		}
+	}
 	
 	
     /**

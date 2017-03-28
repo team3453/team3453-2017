@@ -119,6 +119,18 @@ public class Robot extends IterativeRobot implements PIDOutput {
 	
 	boolean rotateToAngle = false;
 	
+	Sonar sonar;
+	
+	// Custom flags for autonomous modes
+	LineDistance dist;
+	boolean stage1start = false;
+	boolean stage2start = false;
+	boolean stage3start = false;
+	boolean stage4start = false;
+	boolean stage1 = false;
+	boolean stage2 = false;
+	boolean stage3 = false;
+	boolean stage4 = false;
 	
 	/**
 	 * This function is run when the robot is first started up and should be
@@ -254,6 +266,8 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		
 		initiateTurnController();
 		
+		sonar = new Sonar();
+		
 	}
 
 	/**
@@ -291,6 +305,16 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		
 		allianceSelected = (String) allianceChooser.getSelected();
 		System.out.println("Alliance selected: " + allianceSelected);
+		
+		// custom auto flags
+		stage1start = false;
+		stage2start = false;
+		stage3start = false;
+		stage4start = false;
+		stage1 = false;
+		stage2 = false;
+		stage3 = false;
+		stage4 = false;
 	}
 
 	/**
@@ -361,7 +385,7 @@ public class Robot extends IterativeRobot implements PIDOutput {
 			}
 			turn = centerX - (IMG_WIDTH / 2);
 //			_drive.arcadeDrive(-0.6, turn * 0.005);
-			_drive.arcadeDrive(0, turn * 0.005);
+			_drive.arcadeDrive(0,  turn * 0.005);
 			SmartDashboard.putNumber(   "Vision Center X   ", centerX );
 			SmartDashboard.putNumber(   "Vision Center turn", turn );
 			break;
@@ -372,6 +396,10 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		case defaultAutoFwd:
 		default:
 			_drive.setSafetyEnabled(false);
+			if (!stage1start) {
+				stage1start = true;
+				dist = new LineDistance(ahrs.getDisplacementX(),ahrs.getDisplacementY());
+			}
 			autoDriveForward(100,2.0);
 
 			break;
@@ -381,9 +409,9 @@ public class Robot extends IterativeRobot implements PIDOutput {
 	private void autoDriveForward (double t, double x) {
 		boolean keepgoing = false;
 		boolean run = false;
-//		if (turnController != null) {
-		if (run) {
-			if (ahrs.getDisplacementX() < x) {
+		if (turnController != null) {
+//		if (run) {
+			if (dist.getDistance(ahrs.getDisplacementX(),ahrs.getDisplacementY()) < x) {
 				keepgoing = true; // keep driving straight if less than 2 meters
 			}
 		} else {
@@ -392,8 +420,8 @@ public class Robot extends IterativeRobot implements PIDOutput {
 			}
 		}
 		if (keepgoing) { 
-//	    	if (turnController != null) {
-			if (run) {
+	    	if (turnController != null) {
+//			if (run) {
 	    		turnController.setSetpoint(0.0f);
 	    		if (!turnController.isEnabled()) {
 	    			turnController.enable();
@@ -480,6 +508,17 @@ public class Robot extends IterativeRobot implements PIDOutput {
 	public void teleopPeriodic() {
 		
 		ahrs.printStats();
+		sonar.getDistance();
+		
+		double centerX;
+		synchronized (imgLock) {
+			centerX = this.centerX;
+		}
+		turn = centerX - (IMG_WIDTH / 2);
+//		_drive.arcadeDrive(-0.6, turn * 0.005);
+//		_drive.arcadeDrive(0,  turn * 0.005);
+		SmartDashboard.putNumber(   "Vision Center X   ", centerX );
+		SmartDashboard.putNumber(   "Vision Center turn", turn );
 		
 		if(c.getPressureSwitchValue()){ //pressure switch good then set true else be false
 			pressureGood = false;
@@ -488,8 +527,11 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		}
 		
 		// driver input
-		double forward = _gamepad.getRawAxis(1); // logitech gamepad left Y, positive is forward
+		double forward = _gamepad.getRawAxis(1); // logitech gamepad left Y, positive is rear
     	double turn = _gamepad.getRawAxis(4); //logitech gamepad right X, positive means turn right
+    	
+    	SmartDashboard.putNumber(   "Driver fwd   ", forward );
+    	SmartDashboard.putNumber(   "Driver turn  ", turn);
     
     	if (_gamepad.getRawButton(5)) { // left shoulder
     		CAN_BrakeMode();
@@ -564,7 +606,7 @@ public class Robot extends IterativeRobot implements PIDOutput {
     		stopClimber();
     		
     	}
-    	
+
     	if (trigger) {    // Operator trigger is Intake
     		runIntake();
     	} else {
@@ -572,7 +614,11 @@ public class Robot extends IterativeRobot implements PIDOutput {
     	}
     	
     	if (shooter) {    
-    		runShooter();  //placeholder for test
+    		if (_joy.getRawButton(4)) { // shooter and button 4 together
+    			runShooter(0.8,false);
+    		} else {
+    			runShooter();  //placeholder for test
+    		}
     	} else {
     		stopShooter();
     	}
@@ -618,11 +664,33 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		
 		_climber.set(0);
 		_fuelIntake.set(0);
-		_fuelShooter.set(0);		
+		_fuelShooter.set(0);	
+		
+		initiateTurnController ();
+		rotateToAngle = false;
+		
+		if (turnController != null) {
+			turnController.disable();
+		}
 	}
 	
 	@Override
 	public void disabledPeriodic() {
+		ahrs.printStats();
+		sonar.getDistance();
+		
+		initiateTurnController ();
+		rotateToAngle = false;
+		
+		double centerX;
+		synchronized (imgLock) {
+			centerX = this.centerX;
+		}
+		turn = centerX - (IMG_WIDTH / 2);
+//		_drive.arcadeDrive(-0.6, turn * 0.005);
+//		_drive.arcadeDrive(0,  turn * 0.005);
+		SmartDashboard.putNumber(   "Vision Center X   ", centerX );
+		SmartDashboard.putNumber(   "Vision Center turn", turn );
 		
 	}
 	
@@ -648,8 +716,7 @@ public class Robot extends IterativeRobot implements PIDOutput {
 	
 	public void runClimber(double speed) {
 		speed = Math.abs(speed);
-		_climber.set(speed);       // input will turn motor clockwise
-		
+		_climber.set(speed);       // input will turn motor clockwise		
 	}
 	
 	public void stopClimber() {
@@ -664,13 +731,23 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		_fuelIntake.set(0);
 	}
 
-	public void runShooter(double speed) {
+	public void runShooter(double speed, boolean fwd) {
 		speed = Math.abs(speed);
+		if (!fwd) {
+			speed = -1.0 * speed;
+		}
 		_fuelShooter.set(speed);     //placeholder for test
+	}
+	
+	public void runShooter(double speed) {
+		runShooter(speed,true);
 	}
 
 	public void runShooter() {
-		runShooter(0.8);            // doesn't matter if you put pos or neg int here
+		runShooter(0.8);                 // doesn't matter if you put pos or neg int here
+	}
+	public void runShooterIntakeMode() {
+		runShooter(0.8, false);          // runs it in intake mode
 	}
 	
 	public void stopShooter() {
