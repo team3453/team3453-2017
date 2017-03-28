@@ -33,6 +33,8 @@ import edu.wpi.first.wpilibj.vision.VisionThread;
 import edu.wpi.first.wpilibj.PIDController;
 import edu.wpi.first.wpilibj.PIDOutput;
 
+import java.util.ArrayList;
+
 
 
 /**
@@ -132,6 +134,8 @@ public class Robot extends IterativeRobot implements PIDOutput {
 	boolean stage3 = false;
 	boolean stage4 = false;
 	
+	ArrayList<Command> autoCommands;
+	
 	/**
 	 * This function is run when the robot is first started up and should be
 	 * used for any initialization code.
@@ -230,8 +234,7 @@ public class Robot extends IterativeRobot implements PIDOutput {
 			camera.setExposureManual(-144);
 			camera.setFPS(25);
 			camera.setWhiteBalanceAuto();
-			camera.setWhiteBalanceManual(3);
-			
+			camera.setWhiteBalanceManual(3);	
             
             /*
             CvSink cvSink = CameraServer.getInstance().getVideo();
@@ -248,19 +251,7 @@ public class Robot extends IterativeRobot implements PIDOutput {
             */
 //		}).start();
 		
-		try {
-		    visionThread = new VisionThread(camera, new GripPipeline(), pipeline -> {
-		        if (!pipeline.filterContoursOutput().isEmpty()) {
-		            Rect r = Imgproc.boundingRect(pipeline.filterContoursOutput().get(0));
-		            synchronized (imgLock) {
-		                centerX = r.x + (r.width / 2);
-		            }
-		        }
-		    });
-		    visionThread.start();
-		} catch (RuntimeException ex ) {
-			DriverStation.reportError("Error instantiating vision thread:  " + ex.getMessage(), true);
-		}  
+		initiateVisionThread();
         
 		ahrs = new navxmxp_data_monitor();
 		
@@ -268,6 +259,7 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		
 		sonar = new Sonar();
 		
+		autoCommands = new ArrayList<Command>();
 	}
 
 	/**
@@ -293,6 +285,7 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		_fuelIntake.set(0);
 		_fuelShooter.set(0);		
 		
+		initiateVisionThread();
 		initiateTurnController ();
 		rotateToAngle = false;
 		if (turnController != null) {
@@ -305,6 +298,25 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		
 		allianceSelected = (String) allianceChooser.getSelected();
 		System.out.println("Alliance selected: " + allianceSelected);
+
+		switch(autoSelected) {
+		case customAutoBack:
+			break;
+		case autoAllianceGearHang:
+			//autoDriveForward(100,2.0);
+			//autoTurn(1.0,-60.0);
+			_drive.setSafetyEnabled(false);
+			dist = new LineDistance(ahrs.getDisplacementX(),ahrs.getDisplacementY());
+			autoCommands.add(new Command("autoDriveForward",100,2.0));
+			autoCommands.add(new Command("autoTurn",1.0,-6.0));
+			break;
+		case defaultAutoFwd:
+		default:
+			_drive.setSafetyEnabled(false);
+			dist = new LineDistance(ahrs.getDisplacementX(),ahrs.getDisplacementY());
+			autoCommands.add(new Command("autoDriveForward",100,2.0));
+			break;
+		}
 		
 		// custom auto flags
 		stage1start = false;
@@ -315,6 +327,8 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		stage2 = false;
 		stage3 = false;
 		stage4 = false;
+		
+		
 	}
 
 	/**
@@ -391,22 +405,54 @@ public class Robot extends IterativeRobot implements PIDOutput {
 			break;
 		case autoAllianceGearHang:
 			_drive.setSafetyEnabled(false);
-			autoDriveForward(100,2.0);
-			autoTurn(1.0,-60.0);
+			//autoDriveForward(100,2.0);
+			//autoTurn(1.0,-60.0);
+			break;
 		case defaultAutoFwd:
 		default:
 			_drive.setSafetyEnabled(false);
+			/*
 			if (!stage1start) {
 				stage1start = true;
 				dist = new LineDistance(ahrs.getDisplacementX(),ahrs.getDisplacementY());
 			}
 			autoDriveForward(100,2.0);
-
+			*/
 			break;
 		}
+
+		autoDispatch();
+	
 	}
 
-	private void autoDriveForward (double t, double x) {
+	private void autoDispatch () {
+		
+		if (autoCommands.isEmpty()) {
+			return;
+		}
+		Command c = autoCommands.get(0);
+		switch (c.getCommand()) {
+		case "autoDriveForward":
+			if (!autoDriveForward(c.getParm1(),c.getParm2()) ) {
+				autoCommands.remove(0);
+				dist = new LineDistance(ahrs.getDisplacementX(),ahrs.getDisplacementY());
+				count = 0;
+			}
+			break;
+		case "autoTurn":
+			if (!autoTurn(c.getParm1(),c.getParm2()) ) {
+				autoCommands.remove(0);
+				dist = new LineDistance(ahrs.getDisplacementX(),ahrs.getDisplacementY());
+				count = 0;
+			}
+		default:
+			break;
+				
+		}
+			
+	}
+	
+	private boolean autoDriveForward (double t, double x) {
 		boolean keepgoing = false;
 		boolean run = false;
 		if (turnController != null) {
@@ -431,6 +477,8 @@ public class Robot extends IterativeRobot implements PIDOutput {
 	    	} else {
 				_drive.drive(-0.5, 0.0); // drive forwards half speed
 	    	}
+	    	
+	    	return true;
 		} else {
 			//Timer.delay(2.0);		 //    for 2 seconds
 			if (turnController != null) {
@@ -438,9 +486,10 @@ public class Robot extends IterativeRobot implements PIDOutput {
 			}
 			_drive.drive(0.0, 0.0);	 // stop robot
 
+			return false;
 		}
 	}
-	private void autoTurn (double t, double angle) {
+	private boolean autoTurn (double t, double angle) {
 		boolean keepgoing = false;
 		if (turnController != null) {
 			if (Math.abs(ahrs.getYaw()-Math.abs(angle)) > 1) {
@@ -463,13 +512,16 @@ public class Robot extends IterativeRobot implements PIDOutput {
 	    	} else {
 				_drive.arcadeDrive(-0.0, -0.5); // drive forwards half speed with a turn
 	    	}
+	    	
+	    	return true;
 		} else {
 			//Timer.delay(2.0);		 //    for 2 seconds
 			if (turnController != null) {
 	            turnController.disable();
 			}
 			_drive.drive(0.0, 0.0);	 // stop robot
-
+			
+			return false;
 		}
 	}
 	
@@ -493,6 +545,7 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		_fuelIntake.set(0);
 		_fuelShooter.set(0);
 		
+		initiateVisionThread();
 		initiateTurnController ();
 		rotateToAngle = false;
 		
@@ -666,6 +719,7 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		_fuelIntake.set(0);
 		_fuelShooter.set(0);	
 		
+		initiateVisionThread();
 		initiateTurnController ();
 		rotateToAngle = false;
 		
@@ -679,6 +733,7 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		ahrs.printStats();
 		sonar.getDistance();
 		
+		initiateVisionThread();
 		initiateTurnController ();
 		rotateToAngle = false;
 		
@@ -790,6 +845,24 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		    /* tuning of the Turn Controller's P, I and D coefficients.            */
 		    /* Typically, only the P value needs to be modified.                   */
 		    LiveWindow.addActuator("DriveSystem", "RotateController", turnController);
+		  }
+	  }
+	  public void initiateVisionThread() {
+		  
+		  if ((visionThread == null) && (camera != null)) {
+			try {
+			    visionThread = new VisionThread(camera, new GripPipeline(), pipeline -> {
+			        if (!pipeline.filterContoursOutput().isEmpty()) {
+			            Rect r = Imgproc.boundingRect(pipeline.filterContoursOutput().get(0));
+			            synchronized (imgLock) {
+			                centerX = r.x + (r.width / 2);
+			            }
+			        }
+			    });
+			    visionThread.start();
+			} catch (RuntimeException ex ) {
+				DriverStation.reportError("Error instantiating vision thread:  " + ex.getMessage(), true);
+			} 
 		  }
 	  }
 
