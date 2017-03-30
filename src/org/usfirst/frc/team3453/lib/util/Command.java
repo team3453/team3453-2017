@@ -7,6 +7,7 @@ public class Command {
 	double parm2;
 	
 	public Command (String command, double parm1, double parm2) {
+		this.command = command;
 		this.parm1 = parm1;
 		this.parm2 = parm2;
 	}

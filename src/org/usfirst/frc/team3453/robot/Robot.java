@@ -298,6 +298,8 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		
 		allianceSelected = (String) allianceChooser.getSelected();
 		System.out.println("Alliance selected: " + allianceSelected);
+		
+		autoCommands = new ArrayList<Command>();
 
 		switch(autoSelected) {
 		case customAutoBack:
@@ -455,9 +457,12 @@ public class Robot extends IterativeRobot implements PIDOutput {
 	private boolean autoDriveForward (double t, double x) {
 		boolean keepgoing = false;
 		boolean run = false;
-		if (turnController != null) {
-//		if (run) {
+		CAN_BrakeMode();
+//		if (turnController != null) {
+		if (run) {
+			double d = dist.getDistance(ahrs.getDisplacementX(),ahrs.getDisplacementY());
 			if (dist.getDistance(ahrs.getDisplacementX(),ahrs.getDisplacementY()) < x) {
+				SmartDashboard.putNumber(   "dist. traveled   ", d );
 				keepgoing = true; // keep driving straight if less than 2 meters
 			}
 		} else {
