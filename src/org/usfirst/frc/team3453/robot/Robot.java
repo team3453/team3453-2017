@@ -413,6 +413,13 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		case defaultAutoFwd:
 		default:
 			_drive.setSafetyEnabled(false);
+			// Drive for 2 seconds
+			
+			if (count < 200) {
+				_drive.drive(-0.5, 0.0); // drive forwards half speed
+			} else {
+				_drive.drive(0.0, 0.0); // stop robot
+			}  
 			/*
 			if (!stage1start) {
 				stage1start = true;
@@ -423,7 +430,7 @@ public class Robot extends IterativeRobot implements PIDOutput {
 			break;
 		}
 
-		autoDispatch();
+		//autoDispatch();
 	
 	}
 
@@ -447,6 +454,7 @@ public class Robot extends IterativeRobot implements PIDOutput {
 				dist = new LineDistance(ahrs.getDisplacementX(),ahrs.getDisplacementY());
 				count = 0;
 			}
+			break;
 		default:
 			break;
 				
