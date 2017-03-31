@@ -46,7 +46,7 @@ import java.util.ArrayList;
  */
 public class Robot extends IterativeRobot implements PIDOutput {
 	// true for Competition bot, false for Practice bot
-	private boolean isCompetitionBot = false;
+	private boolean isCompetitionBot = true;
 	
 	private boolean pressureGood = false;
 	
@@ -680,7 +680,6 @@ public class Robot extends IterativeRobot implements PIDOutput {
     	} else {
     		stopShooter();
     	}
- 
 		/*
    	if (pressureGood) {
     		currentCount++;
@@ -776,7 +775,7 @@ public class Robot extends IterativeRobot implements PIDOutput {
 	
 	public void runClimber(double speed) {
 		speed = Math.abs(speed);
-		_climber.set(speed);       // input will turn motor clockwise		
+		_climber.set(-speed);       // input will turn motor clockwise		
 	}
 	
 	public void stopClimber() {
@@ -784,7 +783,7 @@ public class Robot extends IterativeRobot implements PIDOutput {
 	}
 	
 	public void runIntake() {
-		_fuelIntake.set(1);
+		_fuelIntake.set(-1);
 	}
 	
 	public void stopIntake() {
@@ -794,9 +793,8 @@ public class Robot extends IterativeRobot implements PIDOutput {
 	public void runShooter(double speed, boolean fwd) {
 		speed = Math.abs(speed);
 		if (!fwd) {
-			speed = -1.0 * speed;
 		}
-		_fuelShooter.set(speed);     //placeholder for test
+		_fuelShooter.set(-speed);     //placeholder for test
 	}
 	
 	public void runShooter(double speed) {
