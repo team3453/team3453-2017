@@ -230,10 +230,10 @@ public class Robot extends IterativeRobot implements PIDOutput {
 			camera = CameraServer.getInstance().startAutomaticCapture();
 			camera.setResolution(IMG_WIDTH, IMG_HEIGHT);
 			camera.setBrightness(20);
-			camera.setExposureAuto();
+			//camera.setExposureAuto();
 			camera.setExposureManual(-144);
-			camera.setFPS(25);
-			camera.setWhiteBalanceAuto();
+			camera.setFPS(20);
+			//camera.setWhiteBalanceAuto();
 			camera.setWhiteBalanceManual(3);	
             
             /*
@@ -309,14 +309,18 @@ public class Robot extends IterativeRobot implements PIDOutput {
 			//autoTurn(1.0,-60.0);
 			_drive.setSafetyEnabled(false);
 			dist = new LineDistance(ahrs.getDisplacementX(),ahrs.getDisplacementY());
-			autoCommands.add(new Command("autoDriveForward",100,2.0));
-			autoCommands.add(new Command("autoTurn",1.0,-6.0));
+			autoCommands.add(new Command("autoDriveForward",300,-0.5));
+			autoCommands.add(new Command("autoTurn",1.0,-30.0));
+			autoCommands.add(new Command("autoDriveForward",150,-0.5));
 			break;
 		case defaultAutoFwd:
 		default:
 			_drive.setSafetyEnabled(false);
 			dist = new LineDistance(ahrs.getDisplacementX(),ahrs.getDisplacementY());
-			autoCommands.add(new Command("autoDriveForward",100,2.0));
+			autoCommands.add(new Command("autoDriveForward",380,-0.5)); // drive forward for 6 sec, half-speed
+			autoCommands.add(new Command("autoDriveForward",12,0.5));   // drive backward for 0.25 sec, half-speed.
+			//autoCommands.size();
+			SmartDashboard.putNumber(   "# Commands", autoCommands.size() );
 			break;
 		}
 		
@@ -369,8 +373,8 @@ public class Robot extends IterativeRobot implements PIDOutput {
 			_drive.drive(-0.5, 0.0); // drive forwards half speed
 		} else {
 			_drive.drive(0.0, 0.0); // stop robot
-		}  */
-		
+		}  
+		*/
 
 		switch(autoSelected) {
 		case customAutoBack:
@@ -415,11 +419,14 @@ public class Robot extends IterativeRobot implements PIDOutput {
 			_drive.setSafetyEnabled(false);
 			// Drive for 2 seconds
 			
-			if (count < 200) {
+			/*   3/31 12:22 DISABLED
+			if (count < 250) {
 				_drive.drive(-0.5, 0.0); // drive forwards half speed
 			} else {
 				_drive.drive(0.0, 0.0); // stop robot
 			}  
+			*/
+			
 			/*
 			if (!stage1start) {
 				stage1start = true;
@@ -430,7 +437,7 @@ public class Robot extends IterativeRobot implements PIDOutput {
 			break;
 		}
 
-		//autoDispatch();
+		autoDispatch();
 	
 	}
 
@@ -443,10 +450,12 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		switch (c.getCommand()) {
 		case "autoDriveForward":
 			if (!autoDriveForward(c.getParm1(),c.getParm2()) ) {
+			
 				autoCommands.remove(0);
 				dist = new LineDistance(ahrs.getDisplacementX(),ahrs.getDisplacementY());
 				count = 0;
 			}
+			SmartDashboard.putNumber(   "# Commands", autoCommands.size() );
 			break;
 		case "autoTurn":
 			if (!autoTurn(c.getParm1(),c.getParm2()) ) {
@@ -462,17 +471,20 @@ public class Robot extends IterativeRobot implements PIDOutput {
 			
 	}
 	
-	private boolean autoDriveForward (double t, double x) {
+	private boolean autoDriveForward (double t, double s) {
+		
+		// s should be -0.5 for forward
+		
 		boolean keepgoing = false;
 		boolean run = false;
 		CAN_BrakeMode();
 //		if (turnController != null) {
 		if (run) {
 			double d = dist.getDistance(ahrs.getDisplacementX(),ahrs.getDisplacementY());
-			if (dist.getDistance(ahrs.getDisplacementX(),ahrs.getDisplacementY()) < x) {
-				SmartDashboard.putNumber(   "dist. traveled   ", d );
-				keepgoing = true; // keep driving straight if less than 2 meters
-			}
+			//if (dist.getDistance(ahrs.getDisplacementX(),ahrs.getDisplacementY()) < x) {
+			//	SmartDashboard.putNumber(   "dist. traveled   ", d );
+			//	keepgoing = true; // keep driving straight if less than 2 meters
+			//}
 		} else {
 			if (count < t) { // spin for 2 seconds
 				keepgoing = true; // keep driving straight if less than 2 seconds
@@ -486,9 +498,9 @@ public class Robot extends IterativeRobot implements PIDOutput {
 	    			turnController.enable();
 	    		}
 	            //currentRotationRate = rotateToAngleRate;
-	            _drive.arcadeDrive(-0.5, rotateToAngleRate);			    	
+	            _drive.arcadeDrive(s, rotateToAngleRate);			    	
 	    	} else {
-				_drive.drive(-0.5, 0.0); // drive forwards half speed
+				_drive.drive(s, 0.0); // drive forwards half speed
 	    	}
 	    	
 	    	return true;
@@ -504,6 +516,8 @@ public class Robot extends IterativeRobot implements PIDOutput {
 	}
 	private boolean autoTurn (double t, double angle) {
 		boolean keepgoing = false;
+		boolean run = false;
+		
 		if (turnController != null) {
 			if (Math.abs(ahrs.getYaw()-Math.abs(angle)) > 1) {
 				keepgoing = true; // keep driving straight if less than 2 meters
@@ -515,6 +529,7 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		}
 		
 		if (keepgoing) { 
+			/*
 	    	if (turnController != null) {
 	    		turnController.setSetpoint(angle);
 	    		if (!turnController.isEnabled()) {
@@ -525,7 +540,13 @@ public class Robot extends IterativeRobot implements PIDOutput {
 	    	} else {
 				_drive.arcadeDrive(-0.0, -0.5); // drive forwards half speed with a turn
 	    	}
-	    	
+	    	*/
+			
+			if (angle < ahrs.getYaw()) {
+				_drive.arcadeDrive(-0.0, -0.5);
+			} else {
+				_drive.arcadeDrive(-0.0, 0.5);
+			}
 	    	return true;
 		} else {
 			//Timer.delay(2.0);		 //    for 2 seconds
@@ -767,13 +788,19 @@ public class Robot extends IterativeRobot implements PIDOutput {
 	}
 	
 	public void driveLo() {
-		sol_01.set(DoubleSolenoid.Value.kForward);
-		sol_23.set(DoubleSolenoid.Value.kForward);
+		//sol_01.set(DoubleSolenoid.Value.kForward);
+		//sol_23.set(DoubleSolenoid.Value.kForward);
+		
+		sol_01.set(DoubleSolenoid.Value.kReverse);
+		sol_23.set(DoubleSolenoid.Value.kReverse);	
 	}
 	
 	public void driveHi() {
-		sol_01.set(DoubleSolenoid.Value.kReverse);
-		sol_23.set(DoubleSolenoid.Value.kReverse);		
+		//sol_01.set(DoubleSolenoid.Value.kReverse);
+		//sol_23.set(DoubleSolenoid.Value.kReverse);	
+		
+		sol_01.set(DoubleSolenoid.Value.kForward);
+		sol_23.set(DoubleSolenoid.Value.kForward);
 	}
 	
 	public void driveNeutral() {
