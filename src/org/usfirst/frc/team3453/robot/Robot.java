@@ -124,6 +124,7 @@ public class Robot extends IterativeRobot implements PIDOutput {
 	Sonar sonar;
 	
 	// Custom flags for autonomous modes
+	double currentHeading = 0.0;
 	LineDistance dist;
 	boolean stage1start = false;
 	boolean stage2start = false;
@@ -211,7 +212,7 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		
 		autoChooser = new SendableChooser<String>();
 		autoChooser.addDefault("Default Fwd", defaultAutoFwd);
-		autoChooser.addObject("Hang Gear, Fuel Goal",  autoAllianceGearHang);
+		autoChooser.addObject("Hang Gear, Right Side",  autoAllianceGearHang);
 		autoChooser.addObject("Auto Back", customAutoBack);
 		autoChooser.addObject("Auto Shooter", customAutoShooter);
 		//autoChooser.addObject("Alliance Wag", customAutoAllianceWag);
@@ -311,7 +312,9 @@ public class Robot extends IterativeRobot implements PIDOutput {
 			dist = new LineDistance(ahrs.getDisplacementX(),ahrs.getDisplacementY());
 			autoCommands.add(new Command("autoDriveForward",300,-0.5));
 			autoCommands.add(new Command("autoTurn",1.0,-30.0));
+			autoCommands.add(new Command("visionChase",0.0,0.0));
 			autoCommands.add(new Command("autoDriveForward",150,-0.5));
+			autoCommands.add(new Command("autoDriveForward",12,0.5));
 			break;
 		case defaultAutoFwd:
 		default:
@@ -405,7 +408,9 @@ public class Robot extends IterativeRobot implements PIDOutput {
 			}
 			turn = centerX - (IMG_WIDTH / 2);
 //			_drive.arcadeDrive(-0.6, turn * 0.005);
-			_drive.arcadeDrive(0,  turn * 0.005);
+			if (Math.abs(turn) > 2) {
+				_drive.arcadeDrive(0,  turn * 0.005);
+			}
 			SmartDashboard.putNumber(   "Vision Center X   ", centerX );
 			SmartDashboard.putNumber(   "Vision Center turn", turn );
 			break;
@@ -448,11 +453,20 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		}
 		Command c = autoCommands.get(0);
 		switch (c.getCommand()) {
+		case "visionChase":
+			if (!visionChase(c.getParm1(),c.getParm2()) ) {
+				autoCommands.remove(0);
+				dist = new LineDistance(ahrs.getDisplacementX(),ahrs.getDisplacementY());
+				currentHeading = ahrs.getYaw();
+				count = 0;
+			}
+			break;
 		case "autoDriveForward":
 			if (!autoDriveForward(c.getParm1(),c.getParm2()) ) {
 			
 				autoCommands.remove(0);
 				dist = new LineDistance(ahrs.getDisplacementX(),ahrs.getDisplacementY());
+				currentHeading = ahrs.getYaw();
 				count = 0;
 			}
 			SmartDashboard.putNumber(   "# Commands", autoCommands.size() );
@@ -461,6 +475,7 @@ public class Robot extends IterativeRobot implements PIDOutput {
 			if (!autoTurn(c.getParm1(),c.getParm2()) ) {
 				autoCommands.remove(0);
 				dist = new LineDistance(ahrs.getDisplacementX(),ahrs.getDisplacementY());
+				currentHeading = ahrs.getYaw();
 				count = 0;
 			}
 			break;
@@ -519,7 +534,8 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		boolean run = false;
 		
 		if (turnController != null) {
-			if (Math.abs(ahrs.getYaw()-Math.abs(angle)) > 1) {
+			//if (Math.abs(ahrs.getYaw()-Math.abs(angle)) > 1) {
+			if ((ahrs.getYaw() - angle) > 1) {
 				keepgoing = true; // keep driving straight if less than 2 meters
 			}
 		} else {
@@ -543,9 +559,9 @@ public class Robot extends IterativeRobot implements PIDOutput {
 	    	*/
 			
 			if (angle < ahrs.getYaw()) {
-				_drive.arcadeDrive(-0.0, -0.5);
+				_drive.arcadeDrive(-0.0, -0.3);
 			} else {
-				_drive.arcadeDrive(-0.0, 0.5);
+				_drive.arcadeDrive(-0.0, 0.3);
 			}
 	    	return true;
 		} else {
@@ -553,6 +569,40 @@ public class Robot extends IterativeRobot implements PIDOutput {
 			if (turnController != null) {
 	            turnController.disable();
 			}
+			_drive.drive(0.0, 0.0);	 // stop robot
+			
+			return false;
+		}
+	}
+	public boolean visionChase (double n, double x) {
+		
+		boolean keepgoing = false;
+		boolean run = false;
+		double centerX;
+		synchronized (imgLock) {
+			centerX = this.centerX;
+		}
+		turn = centerX - (IMG_WIDTH / 2);
+		
+		if (ahrs.getYaw() > currentHeading + 30) {
+			turn = -1 * (Math.abs(turn));
+		}
+		if (ahrs.getYaw() < currentHeading - 30) {
+			turn = Math.abs(turn);
+		}
+				
+		if (count < 200) { // search for max 4 seconds
+			//if (Math.abs(ahrs.getYaw()-Math.abs(angle)) > 1) {
+			if (Math.abs(turn) > 3) {
+				keepgoing = true; // keep driving straight if less than 2 meters
+			}
+		}
+		
+		if (keepgoing) { 
+			_drive.arcadeDrive(0,  turn * 0.005);
+	    	return true;
+		} else {
+
 			_drive.drive(0.0, 0.0);	 // stop robot
 			
 			return false;
